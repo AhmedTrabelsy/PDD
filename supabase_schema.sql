@@ -34,10 +34,7 @@ CREATE TABLE IF NOT EXISTS journal_taches (
                        'Développement', 'Maintenance', 'Déploiement Terrain',
                        'Analyse de Données', 'Documentation', 'Réunion'
                    )),
-    zone_usine     TEXT NOT NULL CHECK (zone_usine IN (
-                       'Ligne A', 'Ligne B', 'Salle Serveurs',
-                       'Bureau d''Études', 'Entrepôt', 'Externe'
-                   )),
+    zone_usine     TEXT NOT NULL,
     statut         TEXT NOT NULL DEFAULT 'EN_COURS' CHECK (statut IN (
                        'A_FAIRE', 'EN_COURS', 'BLOQUE', 'TERMINE'
                    )),

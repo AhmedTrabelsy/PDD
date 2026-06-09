@@ -12,6 +12,9 @@ from supabase import create_client, Client
 import pandas as pd
 from datetime import date, datetime, timezone
 
+# Fuseau horaire cible pour l'affichage des heures
+LOCAL_TZ = "Africa/Tunis"
+
 
 # ── Client Supabase (singleton via cache) ─────────────────────
 @st.cache_resource(show_spinner=False)
@@ -54,7 +57,7 @@ def pointer_sortie(zone: str | None = None, note: str | None = None) -> dict:
 
 
 def get_presence(date_debut: date, date_fin: date) -> pd.DataFrame:
-    """Retourne tous les événements de présence entre deux dates."""
+    """Retourne tous les événements de présence convertis à l'heure locale mais typés UTC pour l'UI."""
     db = get_client()
     res = (
         db.table("journal_presence")
@@ -67,7 +70,11 @@ def get_presence(date_debut: date, date_fin: date) -> pd.DataFrame:
     if not res.data:
         return pd.DataFrame()
     df = pd.DataFrame(res.data)
+    
+    # Hack d'alignement : Heure de Tunis encapsulée dans un type UTC pour l'UI
     df["horodatage"] = pd.to_datetime(df["horodatage"], utc=True)
+    df["horodatage"] = df["horodatage"].dt.tz_convert(LOCAL_TZ).dt.tz_localize(None).dt.tz_localize("UTC")
+    
     df["date_jour"]  = pd.to_datetime(df["date_jour"]).dt.date
     return df
 
@@ -83,7 +90,14 @@ def get_dernier_evenement_aujourd_hui() -> dict | None:
         .limit(1)
         .execute()
     )
-    return res.data[0] if res.data else None
+    if not res.data:
+        return None
+        
+    ev = res.data[0]
+    if "horodatage" in ev and ev["horodatage"]:
+        dt_local = pd.to_datetime(ev["horodatage"], utc=True).tz_convert(LOCAL_TZ)
+        ev["horodatage"] = dt_local.strftime("%Y-%m-%d %H:%M:%S")
+    return ev
 
 
 # ════════════════════════════════════════════════════════════
@@ -121,7 +135,7 @@ def maj_statut_tache(
     raison_blocage: str | None = None,
     livrable: str | None = None,
 ) -> dict:
-    """Met à jour le statut d'une tâche. Enregistre la date de clôture si TERMINE."""
+    """Met à jour le statut d'une tâche."""
     db = get_client()
     payload: dict = {"statut": nouveau_statut}
     if nouveau_statut == "TERMINE":
@@ -140,7 +154,7 @@ def supprimer_tache(tache_id: str) -> None:
 
 
 def get_taches(date_debut: date, date_fin: date) -> pd.DataFrame:
-    """Retourne toutes les tâches créées dans la plage de dates."""
+    """Retourne toutes les tâches de la plage de dates alignées sur la timezone attendue par l'UI."""
     db = get_client()
     res = (
         db.table("journal_taches")
@@ -153,18 +167,25 @@ def get_taches(date_debut: date, date_fin: date) -> pd.DataFrame:
     if not res.data:
         return pd.DataFrame()
     df = pd.DataFrame(res.data)
-    df["cree_le"]    = pd.to_datetime(df["cree_le"],    utc=True)
+    
+    # Alignement forcé en type UTC pour la compatibilité absolue avec les filtres de l'UI
+    df["cree_le"] = pd.to_datetime(df["cree_le"], utc=True).dt.tz_convert(LOCAL_TZ).dt.tz_localize(None).dt.tz_localize("UTC")
+    
     df["cloture_le"] = pd.to_datetime(df["cloture_le"], utc=True, errors="coerce")
+    # On applique la transformation seulement sur les lignes non nulles
+    mask = df["cloture_le"].notna()
+    if mask.any():
+        df.loc[mask, "cloture_le"] = df.loc[mask, "cloture_le"].dt.tz_convert(LOCAL_TZ).dt.tz_localize(None).dt.tz_localize("UTC")
     return df
 
 
 def get_taches_du_jour() -> pd.DataFrame:
-    """Retourne les tâches créées aujourd'hui (pour le tableau de bord employé)."""
+    """Retourne les tâches créées aujourd'hui."""
     return get_taches(date.today(), date.today())
 
 
 def get_toutes_taches() -> pd.DataFrame:
-    """Retourne toutes les tâches historiques (pour les analytics)."""
+    """Retourne toutes les tâches historiques alignées sur la timezone attendue par l'UI."""
     db = get_client()
     res = (
         db.table("journal_taches")
@@ -175,8 +196,13 @@ def get_toutes_taches() -> pd.DataFrame:
     if not res.data:
         return pd.DataFrame()
     df = pd.DataFrame(res.data)
-    df["cree_le"]    = pd.to_datetime(df["cree_le"],    utc=True)
+    
+    df["cree_le"] = pd.to_datetime(df["cree_le"], utc=True).dt.tz_convert(LOCAL_TZ).dt.tz_localize(None).dt.tz_localize("UTC")
+    
     df["cloture_le"] = pd.to_datetime(df["cloture_le"], utc=True, errors="coerce")
+    mask = df["cloture_le"].notna()
+    if mask.any():
+        df.loc[mask, "cloture_le"] = df.loc[mask, "cloture_le"].dt.tz_convert(LOCAL_TZ).dt.tz_localize(None).dt.tz_localize("UTC")
     return df
 
 

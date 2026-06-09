@@ -17,7 +17,7 @@ from components import charts
 
 
 # ── Constantes ────────────────────────────────────────────────
-ZONES = ["Ligne A", "Ligne B", "Salle Serveurs", "Bureau d'Études", "Entrepôt", "Externe"]
+ZONES = ["Usine SICAM M EL BEB"]
 CATEGORIES = ["Développement", "Maintenance", "Déploiement Terrain",
               "Analyse de Données", "Documentation", "Réunion"]
 STATUTS = {"A_FAIRE": "📋 À faire", "EN_COURS": "🔵 En cours",
