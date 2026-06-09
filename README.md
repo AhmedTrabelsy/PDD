@@ -1,6 +1,6 @@
-# 📊 PPD — Tableau de Bord de Performance Personnelle
+# 📊 PPD — Tableau de Bord de Performance
 
-Application Streamlit de suivi de performance individuelle en milieu industriel.
+Application Streamlit de suivi de performance.
 Hébergement base de données sur Supabase (PostgreSQL), déploiement sur Streamlit Community Cloud.
 
 ---
@@ -179,4 +179,4 @@ L'app sera disponible sur `http://localhost:8501`
 
 ---
 
-*PPD v2.0 — Développé dans le cadre d'une initiative de performance individuelle en milieu industriel.*
+*PPD v2.0*
