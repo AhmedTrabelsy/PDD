@@ -22,8 +22,8 @@ st.markdown("""
 
 /* Masquer le menu hamburger et footer Streamlit */
 #MainMenu { visibility: hidden; }
-footer    { visibility: hidden; }
-header    { visibility: hidden; }
+# footer    { visibility: hidden; }
+# header    { visibility: hidden; }
 
 /* Métriques */
 [data-testid="stMetric"] {
@@ -147,11 +147,11 @@ def page_connexion():
         if st.session_state.pin_erreur:
             st.error("❌ Code PIN incorrect. Veuillez réessayer.")
 
-        st.markdown("""
-        <div style='text-align:center; margin-top:3rem; color:#334155; font-size:12px;'>
-            PPD v2.0 · Sécurisé · Données hébergées sur Supabase
-        </div>
-        """, unsafe_allow_html=True)
+        # st.markdown("""
+        # <div style='text-align:center; margin-top:3rem; color:#334155; font-size:12px;'>
+        #     PPD v2.0 · Sécurisé · Données hébergées sur Supabase
+        # </div>
+        # """, unsafe_allow_html=True)
 
 
 # ════════════════════════════════════════════════════════════
@@ -206,12 +206,12 @@ def afficher_sidebar():
             st.session_state.pin_erreur = False
             st.rerun()
 
-        st.markdown("""
-        <div style='position:absolute; bottom:2rem; left:1rem; right:1rem;
-                    color:#334155; font-size:11px; text-align:center;'>
-            PPD v2.0 · © 2025
-        </div>
-        """, unsafe_allow_html=True)
+        # st.markdown("""
+        # <div style='position:absolute; bottom:2rem; left:1rem; right:1rem;
+        #             color:#334155; font-size:11px; text-align:center;'>
+        #     PPD v2.0 · © 2025
+        # </div>
+        # """, unsafe_allow_html=True)
 
 
 # ════════════════════════════════════════════════════════════
