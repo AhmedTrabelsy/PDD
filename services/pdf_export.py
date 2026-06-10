@@ -1,22 +1,13 @@
 # services/pdf_export.py
-# ─────────────────────────────────────────────────────────────
-# Génération du rapport PDF hebdomadaire via fpdf2.
-# ─────────────────────────────────────────────────────────────
-
 from __future__ import annotations
-
 import io
-from datetime import date, timedelta
-
+from datetime import date
 import pandas as pd
 from fpdf import FPDF
-
 from services import kpi_engine as kpi
 
 
 class RapportPDF(FPDF):
-    """Classe PDF personnalisée avec en-tête et pied de page."""
-
     def __init__(self, periode: str):
         super().__init__()
         self.periode = periode
@@ -24,7 +15,6 @@ class RapportPDF(FPDF):
         self.add_page()
 
     def header(self):
-        # Bande bleue en haut
         self.set_fill_color(59, 130, 246)
         self.rect(0, 0, 210, 14, "F")
         self.set_font("Helvetica", "B", 11)
@@ -46,44 +36,42 @@ class RapportPDF(FPDF):
         self.cell(0, 9, f"  {texte}", ln=True, fill=True)
         self.ln(2)
 
-    def kpi_box(self, label: str, valeur: str, delta: str = ""):
-        x = self.get_x()
-        y = self.get_y()
-        self.set_fill_color(18, 24, 40)
-        self.rect(x, y, 60, 22, "F")
-        self.set_xy(x + 2, y + 3)
-        self.set_font("Helvetica", "", 7)
-        self.set_text_color(100, 116, 139)
-        self.cell(56, 5, label.upper())
-        self.set_xy(x + 2, y + 9)
-        self.set_font("Helvetica", "B", 14)
-        self.set_text_color(226, 232, 240)
-        self.cell(56, 8, valeur)
-        if delta:
-            self.set_xy(x + 2, y + 17)
-            self.set_font("Helvetica", "", 7)
-            self.set_text_color(16, 185, 129)
-            self.cell(56, 4, delta)
-        self.set_xy(x + 65, y)
-
-    def ligne_tableau(self, colonnes: list[str], largeurs: list[int], grise: bool = False):
-        if grise:
-            self.set_fill_color(245, 247, 250)
-        else:
-            self.set_fill_color(255, 255, 255)
-        self.set_text_color(30, 30, 30)
+    def kpi_ligne(self, label: str, valeur: str, delta: str = ""):
         self.set_font("Helvetica", "", 9)
-        for val, larg in zip(colonnes, largeurs):
-            self.cell(larg, 7, str(val)[:30], border="B", fill=True)
+        self.set_text_color(100, 116, 139)
+        self.cell(80, 6, label)
+        self.set_font("Helvetica", "B", 9)
+        self.set_text_color(30, 30, 30)
+        self.cell(40, 6, valeur)
+        if delta:
+            self.set_font("Helvetica", "", 8)
+            self.set_text_color(16, 185, 129)
+            self.cell(0, 6, delta)
         self.ln()
 
     def en_tete_tableau(self, colonnes: list[str], largeurs: list[int]):
         self.set_fill_color(59, 130, 246)
         self.set_text_color(255, 255, 255)
-        self.set_font("Helvetica", "B", 9)
+        self.set_font("Helvetica", "B", 8)
         for col, larg in zip(colonnes, largeurs):
-            self.cell(larg, 8, col, fill=True)
+            self.cell(larg, 7, col, fill=True)
         self.ln()
+
+    def ligne_tableau(self, vals: list, largeurs: list[int], grise: bool = False):
+        self.set_fill_color(245, 247, 250 if grise else 255)
+        self.set_text_color(30, 30, 30)
+        self.set_font("Helvetica", "", 8)
+        for val, larg in zip(vals, largeurs):
+            self.cell(larg, 6, str(val)[:35], border="B", fill=grise)
+        self.ln()
+
+    def barre_progression(self, pct: int, couleur_rgb=(59, 130, 246)):
+        bw = 160
+        self.set_fill_color(220, 230, 240)
+        self.rect(self.get_x(), self.get_y(), bw, 5, "F")
+        self.set_fill_color(*couleur_rgb)
+        self.rect(self.get_x(), self.get_y(), bw * pct / 100, 5, "F")
+        self.ln(8)
 
 
 def generer_rapport(
@@ -94,99 +82,77 @@ def generer_rapport(
     date_debut: date,
     date_fin: date,
 ) -> bytes:
-    """
-    Génère le rapport PDF et retourne les bytes (utilisables avec st.download_button).
-    """
     periode = f"{date_debut.strftime('%d/%m/%Y')} – {date_fin.strftime('%d/%m/%Y')}"
     pdf = RapportPDF(periode)
 
-    # ── Titre principal ────────────────────────────────────
-    pdf.set_font("Helvetica", "B", 20)
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_fill_color(11, 15, 26)
-    pdf.rect(0, 14, 210, 35, "F")
-    pdf.set_xy(10, 20)
-    pdf.cell(0, 10, "Rapport de Performance Hebdomadaire")
+    # Titre
+    pdf.set_font("Helvetica", "B", 18)
+    pdf.set_text_color(30, 30, 30)
+    pdf.set_y(20)
+    pdf.cell(0, 10, "Rapport de Performance", ln=True, align="C")
     pdf.set_font("Helvetica", "", 11)
-    pdf.set_text_color(148, 163, 184)
-    pdf.set_xy(10, 33)
-    pdf.cell(0, 8, f"Période : {periode}")
-    pdf.set_y(55)
+    pdf.set_text_color(100, 116, 139)
+    pdf.cell(0, 6, f"Période : {periode}", ln=True, align="C")
+    pdf.ln(8)
 
-    # ── KPI Flash ─────────────────────────────────────────
-    pdf.titre_section("📊  Indicateurs Clés de Performance")
-    pdf.set_y(pdf.get_y() + 2)
-    x_start = pdf.get_x()
+    # KPIs
+    pdf.titre_section("Indicateurs Clés de Performance")
+    pdf.kpi_ligne("Tâches terminées (semaine)",    str(kpi.velocite_semaine_courante(df_taches)))
+    pdf.kpi_ligne("Lead Time moyen (30j)",         f"{kpi.lead_time_moyen(df_taches)}h")
+    pdf.kpi_ligne("Score complexité (semaine)",    str(kpi.score_complexite_semaine(df_taches)))
+    pdf.kpi_ligne("Indice de ponctualité",         f"{kpi.indice_ponctualite(df_presence)}%")
+    pdf.kpi_ligne("Taux d'efficacité",             f"{kpi.taux_efficacite(df_taches, df_presence)}%")
+    pdf.kpi_ligne("Taux de blocage",               f"{kpi.taux_blocage(df_taches)}%")
+    pdf.ln(4)
 
-    v_curr = kpi.velocite_semaine_courante(df_taches)
-    lt     = kpi.lead_time_moyen(df_taches)
-    sc     = kpi.score_complexite_semaine(df_taches)
-    ponct  = kpi.indice_ponctualite(df_presence)
+    # Projets
+    df_proj = kpi.temps_par_projet(df_taches)
+    if not df_proj.empty:
+        pdf.titre_section("Temps par Projet")
+        pdf.en_tete_tableau(["Projet", "Heures", "Tâches", "Score Cx"], [80, 30, 25, 25])
+        for i, (_, row) in enumerate(df_proj.iterrows()):
+            pdf.ligne_tableau(
+                [row["projet_nom"], f"{row['heures']}h", row["nb_taches"], row["score_cx"]],
+                [80, 30, 25, 25], grise=(i % 2 == 0),
+            )
+        pdf.ln(4)
 
-    pdf.kpi_box("Tâches terminées", str(v_curr), "Cette semaine")
-    pdf.kpi_box("Lead Time moyen", f"{lt}h", "30 derniers jours")
-    pdf.kpi_box("Score complexité", str(sc), "Cette semaine")
-    pdf.set_xy(x_start, pdf.get_y() + 25)
-    pdf.kpi_box("Indice ponctualité", f"{ponct}%", "Régularité horaire")
-    effi = kpi.taux_efficacite(df_taches, df_presence)
-    pdf.kpi_box("Taux d'efficacité", f"{effi}%", "Temps utilisé / présent")
-    bloc = kpi.taux_blocage(df_taches)
-    pdf.kpi_box("Taux de blocage", f"{bloc}%", "Tâches bloquées")
-    pdf.set_y(pdf.get_y() + 30)
-
-    # ── Tableau des tâches ────────────────────────────────
-    pdf.titre_section("✅  Journal des Tâches")
+    # Tâches
     if not df_taches.empty:
-        cols   = ["Titre", "Catégorie", "Zone", "Statut", "Cx"]
-        widths = [70, 35, 35, 25, 10]
-        pdf.en_tete_tableau(cols, widths)
+        pdf.titre_section("Journal des Tâches")
+        pdf.en_tete_tableau(["Titre", "Catégorie", "Zone", "Statut", "Cx"], [65, 35, 30, 22, 10])
         for i, (_, row) in enumerate(df_taches.iterrows()):
             pdf.ligne_tableau(
                 [row["titre"], row["categorie"], row["zone_usine"], row["statut"], row["complexite"]],
-                widths,
-                grise=(i % 2 == 0),
+                [65, 35, 30, 22, 10], grise=(i % 2 == 0),
             )
-    else:
-        pdf.set_font("Helvetica", "I", 10)
-        pdf.set_text_color(100, 116, 139)
-        pdf.cell(0, 8, "Aucune tâche enregistrée pour cette période.", ln=True)
+        pdf.ln(4)
 
-    pdf.ln(5)
-
-    # ── Objectifs ─────────────────────────────────────────
+    # Objectifs
     if not df_objectifs.empty:
-        pdf.titre_section("🎯  Objectifs Stratégiques")
+        pdf.titre_section("Objectifs Stratégiques")
         for _, obj in df_objectifs.iterrows():
-            pdf.set_font("Helvetica", "B", 10)
+            pdf.set_font("Helvetica", "B", 9)
             pdf.set_text_color(30, 30, 30)
-            pdf.cell(0, 6, f"{obj['titre']}", ln=True)
-            pdf.set_font("Helvetica", "", 9)
-            pdf.set_text_color(100, 116, 139)
-            pdf.cell(0, 5, f"Progression : {obj['progression']}%  |  Échéance : {obj['date_echeance']}  |  Statut : {obj['statut']}", ln=True)
-            # Barre de progression
-            bw = 160
-            pdf.set_fill_color(30, 41, 59)
-            pdf.rect(pdf.get_x(), pdf.get_y(), bw, 5, "F")
-            pdf.set_fill_color(59, 130, 246)
-            pdf.rect(pdf.get_x(), pdf.get_y(), bw * obj["progression"] / 100, 5, "F")
-            pdf.ln(9)
+            pdf.cell(0, 5, f"{obj['titre']}  —  {obj['statut']}  —  {obj['progression']}%", ln=True)
+            pdf.barre_progression(int(obj["progression"]))
 
-    # ── Notes ─────────────────────────────────────────────
+    # Notes
     if not df_notes.empty:
-        pdf.titre_section("📝  Notes Journalières")
+        pdf.titre_section("Notes Journalières")
         for _, note in df_notes.iterrows():
-            pdf.set_font("Helvetica", "B", 10)
+            pdf.set_font("Helvetica", "B", 9)
             pdf.set_text_color(59, 130, 246)
-            pdf.cell(0, 6, str(note.get("date_jour", "")), ln=True)
+            pdf.cell(0, 5, str(note.get("date_jour", "")), ln=True)
             for champ, label in [("resume", "Résumé"), ("points_bloquants", "Blocages"), ("plan_lendemain", "Demain")]:
                 if note.get(champ):
                     pdf.set_font("Helvetica", "B", 8)
                     pdf.set_text_color(80, 80, 80)
-                    pdf.cell(30, 5, f"{label} :")
+                    pdf.cell(28, 5, f"{label} :")
                     pdf.set_font("Helvetica", "", 8)
                     pdf.set_text_color(30, 30, 30)
-                    pdf.multi_cell(0, 5, str(note[champ])[:200])
-            pdf.ln(3)
+                    pdf.multi_cell(0, 5, str(note[champ])[:300])
+            pdf.ln(2)
 
     buf = io.BytesIO()
     pdf.output(buf)
